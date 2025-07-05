@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import *
 from flask_cors import CORS
 import requests
 import os
@@ -7,11 +7,12 @@ import logging
 app = Flask(__name__)
 CORS(app)
 
-# 🔐 Securely get MailerLite API key from environment
+# Securely fetch MailerLite API key and Group ID from environment variables
 MAILERLITE_API_KEY = os.getenv('MAILERLITE_API_KEY')
-MAILERLITE_BASE_URL = 'https://api.mailerlite.com/api/v2'
+MAILERLITE_GROUP_ID = os.getenv('MAILERLITE_GROUP_ID')  # required for v3
+MAILERLITE_BASE_URL = f'https://connect.mailerlite.com/api/groups/{MAILERLITE_GROUP_ID}/subscribers'
 
-# 🔍 Set up logging
+# Enable logging
 logging.basicConfig(level=logging.INFO)
 
 @app.route('/')
@@ -27,7 +28,9 @@ def subscribe():
         if not email:
             return jsonify({'error': 'Email is required'}), 400
 
-        url = f'{MAILERLITE_BASE_URL}/subscribers'
+        if not MAILERLITE_API_KEY or not MAILERLITE_GROUP_ID:
+            return jsonify({'error': 'Missing API key or group ID'}), 500
+
         headers = {
             'Content-Type': 'application/json',
             'Authorization': f'Bearer {MAILERLITE_API_KEY}'
@@ -36,7 +39,7 @@ def subscribe():
             'email': email
         }
 
-        response = requests.post(url, json=payload, headers=headers)
+        response = requests.post(MAILERLITE_BASE_URL, json=payload, headers=headers)
 
         if response.status_code in (200, 201):
             logging.info(f"Subscribed: {email}")
@@ -50,5 +53,4 @@ def subscribe():
     except Exception as e:
         logging.error(f"Exception in /subscribe: {str(e)}")
         return jsonify({'error': 'Server error', 'details': str(e)}), 500
-
 
